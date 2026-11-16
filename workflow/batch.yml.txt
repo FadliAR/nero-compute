@@ -1,0 +1,82 @@
+name: batch
+
+# Generic parallel batch runner.
+# Dispatch manually with a shard count and a job spec (JSON in this repo).
+# Each shard is an independent matrix job; results come back as artifacts
+# and are merged by the collect job.
+on:
+  workflow_dispatch:
+    inputs:
+      shards:
+        description: "Number of parallel shards (jobs)"
+        required: true
+        default: "16"
+        type: string
+      spec:
+        description: "Path to job spec JSON in this repo"
+        required: true
+        default: "jobs/perft-proof.json"
+        type: string
+      payload_repo:
+        description: "Optional public git repo cloned read-only into ./payload"
+        required: false
+        default: "https://github.com/FadliAR/tiny-chess-01"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+    steps:
+      - id: gen
+        env:
+          SHARDS: ${{ inputs.shards }}
+        run: |
+          python3 -c "import json,os; n=int(os.environ['SHARDS']); print('matrix='+json.dumps({'shard': list(range(n))}))" >> "$GITHUB_OUTPUT"
+
+  shard:
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Clone payload (optional, read-only)
+        if: inputs.payload_repo != ''
+        run: git clone --depth 1 "${{ inputs.payload_repo }}" payload
+      - name: Run shard
+        run: |
+          python3 --version
+          python3 run_shard.py --spec "${{ inputs.spec }}" \
+            --shard ${{ matrix.shard }} --shards "${{ inputs.shards }}" \
+            --payload payload --out result.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: result-${{ matrix.shard }}
+          path: result.json
+
+  collect:
+    needs: shard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: result-*
+          path: results
+      - name: Merge shard results
+        run: |
+          python3 merge_results.py --dir results --out merged.json \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: merged-result
+          path: merged.json
