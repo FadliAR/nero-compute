@@ -4,7 +4,7 @@
   "MAKEFUN_ENV_URL": "http://127.0.0.1:9/unused"
  },
  "params": {
-  "engine_a_url": "https://raw.githubusercontent.com/FadliAR/tiny-chess-01/37802ce23f7ae844df152115ed264e9d0ab16004/main.py",
+  "engine_a_url": "https://gist.githubusercontent.com/FadliAR/29b949da09271c32e083ce8eb60a6391/raw/engine_a_v4_adapter.py",
   "engine_b_url": "https://raw.githubusercontent.com/FadliAR/tiny-chess-01/8be64ff8dde339b15691935cb442c37adc4eeb9d/main.py",
   "bud": null,
   "max_plies": 200
